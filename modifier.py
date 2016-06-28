@@ -1,6 +1,9 @@
 #!/usr/bin/python -tt
 # -*- coding: utf-8 -*-
 
+#Marc Cobler Cosmen - June 2016
+#Released under MIT LICENSE
+#https://opensource.org/licenses/MIT
 
 
 """A tiny Python program to modify some parameters on Gcodes
@@ -16,35 +19,135 @@ import glob
 import shutil
 
 #-------------------VARIABLES--------------------
+#layers is a list containing the line numbers of the layer changes
+layers = []
+#indexes is a list of lists containing the line number and the index of the matching axis to delete for each line
+# indexes = [[line0, index0], [line1, index1]...]
+indexes = []
+#travels is a list of the line numbers containing travels
+travels = []
 
-def parseFile(file):
-    lines = 0
-    layers = 0
-    f = open(file)
-    for line in f:
-        lines += 1
-        layerMatch = re.search(r'[Z][0-9]*',line,)
-        if layerMatch:
-            layers += 1
-        else:
-            pass
+commentFileExtension = '_withoutComments'
+preparedFileExtension = '_prepared'
 
-    print 'There are %d lines in the file' %(lines)
-    print 'There are %d layers in the file' %(layers)
+def findFileInDir(filename, dir):
+    found = False
+    filesList = os.listdir('.')
+    if filename in filesList:
+        found = True
+    else:
+        pass
+    print found
+    return found
 
-def removeAAxis(gcode):
-    option = str(raw_input('Do you want to remove A Axis from the G-code? '))
-    if option == "yes":
-        #let's do This
-        print 'Reading the entire file...'
-        parseFile(gcode)
-        #print 'Removing A Axis from the file...'
-        #print 'Done!'
-    elif option == "no":
+def copyFile(file, extension):
+    #Now let's make a copy of the file to modify it
+    gcodeFileModified = file[:file.find(".")] + extension + file[file.find("."):]
+    #print gcodeFileModified
+    print 'Making a copy of the file...'
+    shutil.copy2(file, gcodeFileModified)
+    print 'Done! Copied to ' + gcodeFileModified
+    return gcodeFileModified
+
+def makeBlankFile(basename, extension):
+    fileName = basename[:basename.find(".")] + extension + basename[basename.find("."):]
+    blankFile = open(fileName, 'w+')
+    blankFile.close()
+    return fileName
+
+def deleteComments(file):
+    option = str(raw_input('Do you want to remove all the commented lines? '))
+    if option == "y":
+        print 'Removing all the comments...'
+        newFileName = makeBlankFile(file, commentFileExtension)
+        inputFile = open(file, 'r')
+        outputFile = open(newFileName, 'w')
+        for line in inputFile:
+            commentMatch = re.search(r';*', line,)
+            if commentMatch:
+                newLine = re.sub(r';.*', '', line)
+                outputFile.write(line.replace(line, newLine))
+            else:
+                outputFile.write(line)
+
+        inputFile.close()
+        outputFile.close()
+        print 'Done!'
+    elif option == "n":
         pass
     else:
-        print 'Type yes or no please'
-        removeAAxis()
+        deleteComments(file)
+
+def parseFile(file):
+    print 'Reading the entire file...'
+    lines = 0
+    travel = 0
+    f = open(file)
+    for line in f:
+        #Search for travel movements in the file
+        #Scan travel speed and make it variable in the search
+        travelMatch = re.search(r'G1 X\d+.\d+ Y\d+.\d+ F7200.\d+', line, )
+        if travelMatch:
+            travel += 1
+            travels.append(lines)
+
+        #Search for the indexes of the A axis in each line
+        axisMatch = re.search(r'A[0-9]*', line,)
+        if axisMatch:
+            #fill the indexes list
+            index = [lines, axisMatch.start()]
+            indexes.append(index)
+            #print index
+        #Search for layer changes
+        layerMatch = re.search(r'[Z][0-9]*',line,)
+        if layerMatch:
+            layers.append(lines)
+        else:
+            pass
+        lines += 1
+    #Close the opened file
+    f.close()
+    print 'There are %d lines in the file' %(lines)
+    print 'There are %d layers in the file' %(len(layers))
+    print 'There are %d travels in the file' %(travel)
+
+def removeAAxis(file):
+    option = str(raw_input('Do you want to remove A Axis from the G-code? '))
+    if option == "y":
+        print 'Removing A Axis from the file...'
+        #First let's see if the _withoutComments file exists in the current directory
+        fileName = file[:file.find(".")] + commentFileExtension + file[file.find("."):]
+        exists = findFileInDir(fileName, ".")
+        #let's create the preparedFileExtension file
+        newFileName = makeBlankFile(file, preparedFileExtension)
+        if exists:
+            #if exist we have to read from it and delete it afterwards
+            print 'File exist. Reading from it'
+            inputFile = open(fileName, 'r') #only read
+            outputFile = open(newFileName, 'w') #only write
+        else:
+            #the file doesn't exists. So we read from the original file
+            print 'File does not exist. Reading from the original'
+            inputFile = open(file, 'r')
+            outputFile = open(newFileName, 'w')
+
+        for line in inputFile:
+            axisMatch = re.search(r'A[0-9]*', line,)
+            if axisMatch:
+                newLine = re.sub(r'A\d*.\d+', '', line)
+                outputFile.write(line.replace(line, newLine))
+            else:
+                outputFile.write(line)
+
+        inputFile.close()
+        outputFile.close()
+        print 'Done!'
+
+    elif option == "n":
+        pass
+    else:
+        print 'Type "y" for yes or "n" for no please'
+        removeAAxis(file)
 
 # Define a main() function that prints a little greeting.
 def main():
@@ -77,14 +180,11 @@ def main():
             print 'The file is not valid. Write it exactly as it is.'
             print '\n\n\n'
             main()
-    #Now let's make a copy of the file to modify it
-    gcodeFileModified = gcodeFile[:gcodeFile.find(".")] + '_prepared.gcode'
-    #print gcodeFileModified
-    print 'Making a copy of the file...'
-    shutil.copy2(gcodeFile, gcodeFileModified)
-    print 'Done! Copied to ' + gcodeFileModified
-    #Now let's start modifying the gcodeFileModified itself
-    removeAAxis(gcodeFileModified)
+
+    #Now let's start modifying the new gcode itself
+    parseFile(gcodeFile)
+    deleteComments(gcodeFile)
+    removeAAxis(gcodeFile)
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
