@@ -38,4 +38,3 @@ The output file will be `file_prepared.gcode`
 - Add custom G-codes between travels
 - Improve parsing and statistics
 - Add file verification when input file
-- 
