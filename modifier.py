@@ -37,7 +37,7 @@ def findFileInDir(filename, dir):
         found = True
     else:
         pass
-    print found
+    #print found
     return found
 
 def copyFile(file, extension):
