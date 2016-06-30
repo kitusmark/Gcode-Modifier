@@ -33,8 +33,9 @@ The output file will be `file_prepared.gcode`
 
 ## TO-DO
 
-- Capability to select the output file extension
-- Add custom G-codes between layers
-- Add custom G-codes between travels
-- Improve parsing and statistics
-- Add file verification when input file
+- [x] Capability to select the output file extension
+- [ ] Add custom G-codes between layers
+- [ ] Add custom G-codes between travels
+- [ ] Improve parsing and statistics
+- [x] Add file verification when input file
+- [ ] Put all files related functions in a module

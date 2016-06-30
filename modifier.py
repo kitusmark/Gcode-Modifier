@@ -26,13 +26,20 @@ layers = []
 indexes = []
 #travels is a list of the line numbers containing travels
 travels = []
+#file input valid formats
+formats =[".gcode", ".txt"]
 
 commentFileExtension = '_withoutComments'
 preparedFileExtension = '_prepared'
 
-def findFileInDir(filename, dir):
+def getFileExtension(name):
+    extension = name[name.find("."):]
+    #print extension
+    return extension
+
+def findFileInDir(filename, dir='.'):
     found = False
-    filesList = os.listdir('.')
+    filesList = os.listdir(dir)
     if filename in filesList:
         found = True
     else:
@@ -49,17 +56,17 @@ def copyFile(file, extension):
     print 'Done! Copied to ' + gcodeFileModified
     return gcodeFileModified
 
-def makeBlankFile(basename, extension):
-    fileName = basename[:basename.find(".")] + extension + basename[basename.find("."):]
+def makeBlankFile(basename, extension = '', format = '.gcode'):
+    fileName = basename[:basename.find(".")] + extension + format
     blankFile = open(fileName, 'w+')
     blankFile.close()
     return fileName
 
-def deleteComments(file):
+def deleteComments(file, format = '.gcode'):
     option = str(raw_input('Do you want to remove all the commented lines? '))
     if option == "y":
         print 'Removing all the comments...'
-        newFileName = makeBlankFile(file, commentFileExtension)
+        newFileName = makeBlankFile(file, commentFileExtension, format)
         inputFile = open(file, 'r')
         outputFile = open(newFileName, 'w')
         for line in inputFile:
@@ -111,15 +118,15 @@ def parseFile(file):
     print 'There are %d layers in the file' %(len(layers))
     print 'There are %d travels in the file' %(travel)
 
-def removeAAxis(file):
+def removeAAxis(file, format = '.gcode'):
     option = str(raw_input('Do you want to remove A Axis from the G-code? '))
     if option == "y":
         print 'Removing A Axis from the file...'
         #First let's see if the _withoutComments file exists in the current directory
-        fileName = file[:file.find(".")] + commentFileExtension + file[file.find("."):]
-        exists = findFileInDir(fileName, ".")
+        fileName = file[:file.find(".")] + commentFileExtension + format
+        exists = findFileInDir(fileName)
         #let's create the preparedFileExtension file
-        newFileName = makeBlankFile(file, preparedFileExtension)
+        newFileName = makeBlankFile(file, preparedFileExtension, format)
         if exists:
             #if exist we have to read from it and delete it afterwards
             print 'File exist. Reading from it'
@@ -141,6 +148,9 @@ def removeAAxis(file):
 
         inputFile.close()
         outputFile.close()
+        if exists:
+            #Remove the file we don't need
+            os.remove(fileName)
         print 'Done!'
 
     elif option == "n":
@@ -151,24 +161,31 @@ def removeAAxis(file):
 
 # Define a main() function that prints a little greeting.
 def main():
-    print 'Welcome to the G-code Modifier Utility'
+    print '\n --------Welcome to the G-code Modifier Utility--------- \n'
     #Get the arguments of the program and decide what to do
     if len(sys.argv) >= 2:
+        fileExtension = getFileExtension(sys.argv[1])
         #the argument should be a .gcode file
-        if sys.argv[1].endswith(".gcode"):
+        if fileExtension in formats:
             gcodeFile = sys.argv[1]
-            print 'The file selected is: ', gcodeFile
+            if findFileInDir(gcodeFile):
+                #file specified found in the directory
+                print 'The file selected is: ', gcodeFile
+            else:
+                print 'File not found in directory. Please try again.'
+                quit()
         else:
             #There has been an Error
-            print 'The file is not valid. Write it exactly as it is.'
+            print 'The file is not valid. Input files should be .gcode or .txt'
             print '\n\n\n'
-            main()
+            quit()
     else:
         #We should print all the available .gcode files in the working directory
         print 'No input file detected. Here are the available .gcode files in '
         print os.getcwd() + ' :'
         for file in glob.glob('*.gcode'):
-            print '->' + file + '\n'
+            print '->' + file
+        print '\n'
         #Now we have to select the file we want to work with
         rawInput = str(raw_input('Please type the g-code file you want to work with: '))
         if rawInput.endswith(".gcode"):
@@ -181,10 +198,12 @@ def main():
             print '\n\n\n'
             main()
 
+    #ask the user the output file format
+    fileFormat = str(raw_input('Type the output file format: '))
     #Now let's start modifying the new gcode itself
     parseFile(gcodeFile)
-    deleteComments(gcodeFile)
-    removeAAxis(gcodeFile)
+    deleteComments(gcodeFile, fileFormat)
+    removeAAxis(gcodeFile, fileFormat)
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
