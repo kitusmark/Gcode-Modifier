@@ -15,8 +15,8 @@ printers controlled by MACH3 and with a VFD driving a pump
 import sys
 import os
 import re
-import glob
-import shutil
+from glob import glob
+from fileHandler import *
 
 #-------------------VARIABLES--------------------
 #layers is a list containing the line numbers of the layer changes
@@ -31,59 +31,6 @@ formats =[".gcode", ".txt"]
 
 commentFileExtension = '_withoutComments'
 preparedFileExtension = '_prepared'
-
-def getFileExtension(name):
-    extension = name[name.find("."):]
-    #print extension
-    return extension
-
-def findFileInDir(filename, dir='.'):
-    found = False
-    filesList = os.listdir(dir)
-    if filename in filesList:
-        found = True
-    else:
-        pass
-    #print found
-    return found
-
-def copyFile(file, extension):
-    #Now let's make a copy of the file to modify it
-    gcodeFileModified = file[:file.find(".")] + extension + file[file.find("."):]
-    #print gcodeFileModified
-    print 'Making a copy of the file...'
-    shutil.copy2(file, gcodeFileModified)
-    print 'Done! Copied to ' + gcodeFileModified
-    return gcodeFileModified
-
-def makeBlankFile(basename, extension = '', format = '.gcode'):
-    fileName = basename[:basename.find(".")] + extension + format
-    blankFile = open(fileName, 'w+')
-    blankFile.close()
-    return fileName
-
-def deleteComments(file, format = '.gcode'):
-    option = str(raw_input('Do you want to remove all the commented lines? '))
-    if option == "y":
-        print 'Removing all the comments...'
-        newFileName = makeBlankFile(file, commentFileExtension, format)
-        inputFile = open(file, 'r')
-        outputFile = open(newFileName, 'w')
-        for line in inputFile:
-            commentMatch = re.search(r';*', line,)
-            if commentMatch:
-                newLine = re.sub(r';.*', '', line)
-                outputFile.write(line.replace(line, newLine))
-            else:
-                outputFile.write(line)
-
-        inputFile.close()
-        outputFile.close()
-        print 'Done!'
-    elif option == "n":
-        pass
-    else:
-        deleteComments(file)
 
 def parseFile(file):
     print 'Reading the entire file...'
@@ -118,46 +65,64 @@ def parseFile(file):
     print 'There are %d layers in the file' %(len(layers))
     print 'There are %d travels in the file' %(travel)
 
-def removeAAxis(file, format = '.gcode'):
-    option = str(raw_input('Do you want to remove A Axis from the G-code? '))
-    if option == "y":
-        print 'Removing A Axis from the file...'
-        #First let's see if the _withoutComments file exists in the current directory
-        fileName = file[:file.find(".")] + commentFileExtension + format
-        exists = findFileInDir(fileName)
-        #let's create the preparedFileExtension file
-        newFileName = makeBlankFile(file, preparedFileExtension, format)
-        if exists:
-            #if exist we have to read from it and delete it afterwards
-            print 'File exist. Reading from it'
-            inputFile = open(fileName, 'r') #only read
-            outputFile = open(newFileName, 'w') #only write
+def deleteComments(file, format = '.gcode'):
+    """
+    Deletes all the comments. In a G-code file usually comments start with ';'
+    """
+    print 'Removing all the comments...'
+    newFileName = makeBlankFile(file, commentFileExtension, format)
+    inputFile = open(file, 'r')
+    outputFile = open(newFileName, 'w')
+    for line in inputFile:
+        commentMatch = re.search(r';*', line,)
+        if commentMatch:
+            newLine = re.sub(r';.*', '', line)
+            outputFile.write(line.replace(line, newLine))
         else:
-            #the file doesn't exists. So we read from the original file
-            print 'File does not exist. Reading from the original'
-            inputFile = open(file, 'r')
-            outputFile = open(newFileName, 'w')
+            outputFile.write(line)
 
-        for line in inputFile:
-            axisMatch = re.search(r'A[0-9]*', line,)
-            if axisMatch:
-                newLine = re.sub(r'A\d*.\d+', '', line)
-                outputFile.write(line.replace(line, newLine))
-            else:
-                outputFile.write(line)
+    inputFile.close()
+    outputFile.close()
+    print 'Done!'
 
-        inputFile.close()
-        outputFile.close()
-        if exists:
-            #Remove the file we don't need
-            os.remove(fileName)
-        print 'Done!'
-
-    elif option == "n":
-        pass
+def removeAAxis(file, format = '.gcode'):
+    """
+    Removes A axis from the G-code line. this is useful when you have a machine that does not use a
+    specified axis.
+    """
+    print 'Removing A Axis from the file...'
+    #First let's see if the _withoutComments file exists in the current directory
+    fileName = file[:file.find(".")] + commentFileExtension + format
+    exists = findFileInDir(fileName)
+    #let's create the preparedFileExtension file
+    newFileName = makeBlankFile(file, preparedFileExtension, format)
+    if exists:
+        #if exist we have to read from it and delete it afterwards
+        print 'File exist. Reading from it'
+        inputFile = open(fileName, 'r') #only read
+        outputFile = open(newFileName, 'w') #only write
     else:
-        print 'Type "y" for yes or "n" for no please'
-        removeAAxis(file)
+        #the file doesn't exists. So we read from the original file
+        print 'File does not exist. Reading from the original'
+        inputFile = open(file, 'r')
+        outputFile = open(newFileName, 'w')
+
+    for line in inputFile:
+        axisMatch = re.search(r'A[0-9]*', line,)
+        if axisMatch:
+            newLine = re.sub(r'A\d*.\d+', '', line)
+            outputFile.write(line.replace(line, newLine))
+        else:
+            outputFile.write(line)
+
+    inputFile.close()
+    outputFile.close()
+    if exists:
+        #Remove the file we don't need
+        os.remove(fileName)
+    print 'Done!'
+
+
 
 # Define a main() function that prints a little greeting.
 def main():
@@ -182,28 +147,56 @@ def main():
     else:
         #We should print all the available .gcode files in the working directory
         print 'No input file detected. Here are the available .gcode files in '
-        print os.getcwd() + ' :'
-        for file in glob.glob('*.gcode'):
-            print '->' + file
+        print os.getcwd() + ' : \n'
+        filesInDir = glob('*.gcode')    #get all the gcodes in the directory
+        for file in filesInDir:         #print them out in a 'list'
+            print '-> ' + file
         print '\n'
         #Now we have to select the file we want to work with
         rawInput = str(raw_input('Please type the g-code file you want to work with: '))
-        if rawInput.endswith(".gcode"):
-            #The input file is a valid file!
+        if rawInput in filesInDir:
+            #The input file is the list of files!
             gcodeFile = rawInput
             print 'The file selected is: ', gcodeFile
         else:
             #There has been an Error
-            print 'The file is not valid. Write it exactly as it is.'
-            print '\n\n\n'
+            print 'The file is not in the directory. Please verify and write it as it is.'
+            print '\n\n'
             main()
 
     #ask the user the output file format
     fileFormat = str(raw_input('Type the output file format: '))
-    #Now let's start modifying the new gcode itself
+    if not fileFormat:      #check if it's empty
+        print 'No file format specified, please try again'
+        main()
+    elif fileFormat == '.': #check if there's only a point
+        print 'you missed the rest of the format! try again'
+        main()
+    elif not fileFormat.startswith('.'):
+        print 'You missed the . !! I\'ll put it for you...'
+        fileFormat = '.' + fileFormat
+    else:
+        pass
+
+    #Open the file, get some data and print it out
     parseFile(gcodeFile)
-    deleteComments(gcodeFile, fileFormat)
-    removeAAxis(gcodeFile, fileFormat)
+    #Now let's start modifying the new gcode itself
+    optionComments = str(raw_input('Do you want to remove all the comments in the file? '))
+    optionAxis = str(raw_input('Do you want to remove A Axis from the G-code? '))
+    if optionComments == 'y':
+        deleteComments(gcodeFile, fileFormat)
+        if optionAxis == 'y':
+            removeAAxis(gcodeFile, fileFormat)
+        elif optionAxis == 'n':
+            pass
+        else:
+            print 'Type "y" for yes or "n" for no please'
+            main()
+    elif optionComments == 'n':
+        pass
+    else:
+        print 'Type "y" for yes or "n" for no please'
+        main()
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
