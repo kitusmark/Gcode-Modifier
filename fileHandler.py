@@ -42,9 +42,9 @@ def copyFile(file, extension=''):
     #Now let's make a copy of the file to modify it
     gcodeFileModified = file[:file.find(".")] + extension + file[file.find("."):]
     #print gcodeFileModified
-    print 'Making a copy of the file...'
+    print ('Making a copy of the file...')
     shutil.copy2(file, gcodeFileModified)
-    print 'Done! Copied to ' + gcodeFileModified
+    print ('Done! Copied to ' + gcodeFileModified)
     return gcodeFileModified
 
 def makeBlankFile(basename, extension = '', format = '.txt'):
